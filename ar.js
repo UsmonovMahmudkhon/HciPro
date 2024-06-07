@@ -1,11 +1,11 @@
 //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
 // Import three.js and ARButton module
-import * as THREE from './libs/three.module.js'
+// Import three.js and ARButton module
+import * as THREE from './libs/three.module.js';
 import { ARButton } from './libs/ARButton.js';
 
 // Use environment variable for the key
-const KEY = process.env.OPENAI_API_KEY || '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
-';
+const KEY = process.env.OPENAI_API_KEY || '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';
 
 let container;
 let camera, scene, renderer;
@@ -68,6 +68,19 @@ function init() {
     });
 
     window.addEventListener("resize", onWindowResize, false);
+
+    // Add a check to make sure the XR session is supported
+    if (!navigator.xr || !navigator.xr.isSessionSupported) {
+        alert('WebXR not supported in this browser or device');
+        return;
+    }
+
+    // Check if session is supported and provide feedback
+    navigator.xr.isSessionSupported('immersive-ar').then((supported) => {
+        if (!supported) {
+            alert('AR not supported in this browser or device');
+        }
+    });
 }
 
 async function generateImage(text) {
@@ -174,3 +187,6 @@ function render(timestamp, frame) {
     }
     renderer.render(scene, camera);
 }
+
+
+ 
