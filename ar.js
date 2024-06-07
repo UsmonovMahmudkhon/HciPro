@@ -4,7 +4,6 @@ import { ARButton } from 'https://cdn.jsdelivr.net/npm/three@0.151.3/examples/js
 // Replace with your Unsplash Access Key
 const UNSPLASH_ACCESS_KEY = 'gqEYNmX6p2vGAUvjyz-EntntGkwDA2noKPaZdzhuxQ0';
 
-// Initialize AR environment
 let container, camera, scene, renderer;
 let reticle, hitTestSource, localSpace, hitTestSourceInitialized = false;
 
@@ -14,24 +13,23 @@ animate();
 async function init() {
     container = document.getElementById('ar-container');
 
-    // Basic scene setup
     scene = new THREE.Scene();
     camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 20);
+    scene.add(camera);
+
     renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
     renderer.setPixelRatio(window.devicePixelRatio);
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.xr.enabled = true;
     container.appendChild(renderer.domElement);
 
-    // Lighting
-    var light = new THREE.HemisphereLight(0xffffff, 0xbbbbff, 1);
+    const light = new THREE.HemisphereLight(0xffffff, 0xbbbbff, 1);
     light.position.set(0.5, 1, 0.25);
     scene.add(light);
 
-    // Reticle for image placement
     addReticleToScene();
 
-    // AR Button
+    // Create AR button
     const button = ARButton.createButton(renderer, {
         requiredFeatures: ["hit-test"],
         optionalFeatures: ["dom-overlay"],
@@ -41,14 +39,13 @@ async function init() {
 
     renderer.xr.addEventListener('sessionstart', () => {
         document.getElementById('content').style.visibility = 'visible';
+        console.log('AR session started.');
     });
 
     window.addEventListener("resize", onWindowResize, false);
 
-    // Load and display Unsplash images
+    // Load Unsplash images
     await loadUnsplashImages();
-
-    console.log('Initialization complete.');
 }
 
 async function loadUnsplashImages() {
