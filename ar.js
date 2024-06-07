@@ -1,21 +1,27 @@
 //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
-// Import three.js and ARButton module
+
+
 // Import three.js and ARButton module
 import * as THREE from './libs/three.module.js';
 import { ARButton } from './libs/ARButton.js';
 
-// Use environment variable for the key
-const KEY = process.env.OPENAI_API_KEY || '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';
+// Replace with secure way of handling API keys
+const KEY = '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';
 
-let container;
-let camera, scene, renderer;
-let reticle;
+let container, camera, scene, renderer;
+let reticle, hitTestSource, localSpace, hitTestSourceInitialized = false;
 
 init();
 animate();
 
 function init() {
     container = document.getElementById('ar-container');
+
+    // Check if container is available
+    if (!container) {
+        console.error('Container element not found');
+        return;
+    }
 
     scene = new THREE.Scene();
 
@@ -33,7 +39,6 @@ function init() {
     renderer.setPixelRatio(window.devicePixelRatio);
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.xr.enabled = true;
-    renderer.xr.addEventListener('sessionstart', visibleContent);
     container.appendChild(renderer.domElement);
 
     var light = new THREE.HemisphereLight(0xffffff, 0xbbbbff, 1);
@@ -42,6 +47,7 @@ function init() {
 
     addReticleToScene();
 
+    // Create AR button
     const button = ARButton.createButton(renderer, {
         requiredFeatures: ["hit-test"],
         optionalFeatures: ["dom-overlay"],
@@ -50,37 +56,28 @@ function init() {
         }
     });
     document.body.appendChild(button);
-    renderer.domElement.style.display = "none";
 
-    const generateButton = document.getElementById('generate');
-    generateButton.addEventListener('click', () => {
-        generateImage('cat')
-            .then(res => {
-                if (res && res.data && res.data[0] && res.data[0].url) {
-                    placePictureToScene(res.data[0].url);
-                } else {
-                    alert('Failed to generate image');
-                }
-            })
-            .catch(e => {
-                alert(`Error: ${e.message}`);
-            });
-    });
-
+    // Ensure the session start visibility change
+    renderer.xr.addEventListener('sessionstart', visibleContent);
     window.addEventListener("resize", onWindowResize, false);
 
-    // Add a check to make sure the XR session is supported
-    if (!navigator.xr || !navigator.xr.isSessionSupported) {
-        alert('WebXR not supported in this browser or device');
-        return;
-    }
-
-    // Check if session is supported and provide feedback
-    navigator.xr.isSessionSupported('immersive-ar').then((supported) => {
-        if (!supported) {
-            alert('AR not supported in this browser or device');
+    // Generate image on button click
+    const generateButton = document.getElementById('generate');
+    generateButton.addEventListener('click', async () => {
+        try {
+            const result = await generateImage('cat');
+            if (result && result.data && result.data[0] && result.data[0].url) {
+                placePictureToScene(result.data[0].url);
+            } else {
+                alert('Failed to generate image');
+            }
+        } catch (error) {
+            alert(`Error: ${error.message}`);
         }
     });
+
+    // Debugging info
+    console.log('Initialization complete');
 }
 
 async function generateImage(text) {
@@ -115,29 +112,35 @@ function addReticleToScene() {
     reticle.matrixAutoUpdate = false;
     reticle.visible = false;
     scene.add(reticle);
+    console.log('Reticle added to scene');
 }
 
 function visibleContent() {
-    document.getElementById('content').style.visibility = 'visible';
+    const content = document.getElementById('content');
+    if (content) {
+        content.style.visibility = 'visible';
+        console.log('AR session started');
+    } else {
+        console.error('Content element not found');
+    }
 }
 
 function placePictureToScene(url) {
     if (reticle.visible) {
-        try {
-            const geometry = new THREE.BoxGeometry(0.5, 0, 0.5);
-            const textureLoader = new THREE.TextureLoader();
-            const texture = textureLoader.load(url, () => {
-                const material = new THREE.MeshBasicMaterial({ map: texture });
-                const mesh = new THREE.Mesh(geometry, material);
-                mesh.position.setFromMatrixPosition(reticle.matrix);
-                mesh.quaternion.setFromRotationMatrix(reticle.matrix);
-                scene.add(mesh);
-            }, undefined, (error) => {
-                alert(`Texture load error: ${error.message}`);
-            });
-        } catch (error) {
-            alert(`Error placing picture: ${error.message}`);
-        }
+        const geometry = new THREE.PlaneGeometry(0.5, 0.5);
+        const textureLoader = new THREE.TextureLoader();
+        const texture = textureLoader.load(url, () => {
+            const material = new THREE.MeshBasicMaterial({ map: texture });
+            const mesh = new THREE.Mesh(geometry, material);
+            mesh.position.setFromMatrixPosition(reticle.matrix);
+            mesh.quaternion.setFromRotationMatrix(reticle.matrix);
+            scene.add(mesh);
+            console.log('Picture placed in scene');
+        }, undefined, (error) => {
+            console.error(`Texture load error: ${error.message}`);
+        });
+    } else {
+        console.warn('Reticle not visible; picture not placed');
     }
 }
 
@@ -151,10 +154,6 @@ function animate() {
     renderer.setAnimationLoop(render);
 }
 
-let hitTestSource = null;
-let localSpace = null;
-let hitTestSourceInitialized = false;
-
 async function initializeHitTestSource() {
     const session = renderer.xr.getSession();
     const viewerSpace = await session.requestReferenceSpace("viewer");
@@ -165,6 +164,7 @@ async function initializeHitTestSource() {
         hitTestSourceInitialized = false;
         hitTestSource = null;
     });
+    console.log('Hit test source initialized');
 }
 
 function render(timestamp, frame) {
@@ -187,6 +187,3 @@ function render(timestamp, frame) {
     }
     renderer.render(scene, camera);
 }
-
-
- 
