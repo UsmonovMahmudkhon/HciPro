@@ -1,107 +1,73 @@
-//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
+import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.151.3/build/three.module.js';
+import { ARButton } from 'https://cdn.jsdelivr.net/npm/three@0.151.3/examples/jsm/webxr/ARButton.js';
 
+// Replace with your Unsplash Access Key
+const UNSPLASH_ACCESS_KEY = 'gqEYNmX6p2vGAUvjyz-EntntGkwDA2noKPaZdzhuxQ0';
 
-// Import three.js and ARButton module
-import * as THREE from './libs/three.module.js';
-import { ARButton } from './libs/ARButton.js';
-
-// Replace with secure way of handling API keys
-const KEY = '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';
-
+// Initialize AR environment
 let container, camera, scene, renderer;
 let reticle, hitTestSource, localSpace, hitTestSourceInitialized = false;
 
 init();
 animate();
 
-function init() {
+async function init() {
     container = document.getElementById('ar-container');
 
-    // Check if container is available
-    if (!container) {
-        console.error('Container element not found');
-        return;
-    }
-
+    // Basic scene setup
     scene = new THREE.Scene();
-
-    camera = new THREE.PerspectiveCamera(
-        70,
-        window.innerWidth / window.innerHeight,
-        0.01,
-        20
-    );
-
-    renderer = new THREE.WebGLRenderer({
-        antialias: true,
-        alpha: true
-    });
+    camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 20);
+    renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
     renderer.setPixelRatio(window.devicePixelRatio);
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.xr.enabled = true;
     container.appendChild(renderer.domElement);
 
+    // Lighting
     var light = new THREE.HemisphereLight(0xffffff, 0xbbbbff, 1);
     light.position.set(0.5, 1, 0.25);
     scene.add(light);
 
+    // Reticle for image placement
     addReticleToScene();
 
-    // Create AR button
+    // AR Button
     const button = ARButton.createButton(renderer, {
         requiredFeatures: ["hit-test"],
         optionalFeatures: ["dom-overlay"],
-        domOverlay: {
-            root: document.getElementById('content')
-        }
+        domOverlay: { root: document.getElementById('content') }
     });
     document.body.appendChild(button);
 
-    // Ensure the session start visibility change
-    renderer.xr.addEventListener('sessionstart', visibleContent);
-    window.addEventListener("resize", onWindowResize, false);
-
-    // Generate image on button click
-    const generateButton = document.getElementById('generate');
-    generateButton.addEventListener('click', async () => {
-        try {
-            const result = await generateImage('cat');
-            if (result && result.data && result.data[0] && result.data[0].url) {
-                placePictureToScene(result.data[0].url);
-            } else {
-                alert('Failed to generate image');
-            }
-        } catch (error) {
-            alert(`Error: ${error.message}`);
-        }
+    renderer.xr.addEventListener('sessionstart', () => {
+        document.getElementById('content').style.visibility = 'visible';
     });
 
-    // Debugging info
-    console.log('Initialization complete');
+    window.addEventListener("resize", onWindowResize, false);
+
+    // Load and display Unsplash images
+    await loadUnsplashImages();
+
+    console.log('Initialization complete.');
 }
 
-async function generateImage(text) {
+async function loadUnsplashImages() {
     try {
-        const response = await fetch('https://api.openai.com/v1/images/generations', {
-            method: 'POST',
-            headers: {
-                "Content-Type": "application/json",
-                "Authorization": `Bearer ${KEY}`
-            },
-            body: JSON.stringify({
-                model: 'dall-e-3',
-                prompt: text,
-                n: 1
-            })
+        const response = await fetch(`https://api.unsplash.com/photos/random?count=10&client_id=${UNSPLASH_ACCESS_KEY}`);
+        const images = await response.json();
+        const imageSelector = document.getElementById('image-selector');
+
+        images.forEach(image => {
+            const imgElement = document.createElement('img');
+            imgElement.src = image.urls.thumb;
+            imgElement.alt = image.description || 'Unsplash Image';
+            imgElement.addEventListener('click', () => {
+                placePictureToScene(image.urls.full);
+            });
+            imageSelector.appendChild(imgElement);
         });
-
-        if (!response.ok) {
-            throw new Error(`HTTP error! Status: ${response.status}`);
-        }
-
-        return response.json();
     } catch (error) {
-        throw new Error(`Failed to generate image: ${error.message}`);
+        console.error('Error fetching images:', error);
     }
 }
 
@@ -115,16 +81,6 @@ function addReticleToScene() {
     console.log('Reticle added to scene');
 }
 
-function visibleContent() {
-    const content = document.getElementById('content');
-    if (content) {
-        content.style.visibility = 'visible';
-        console.log('AR session started');
-    } else {
-        console.error('Content element not found');
-    }
-}
-
 function placePictureToScene(url) {
     if (reticle.visible) {
         const geometry = new THREE.PlaneGeometry(0.5, 0.5);
@@ -135,12 +91,12 @@ function placePictureToScene(url) {
             mesh.position.setFromMatrixPosition(reticle.matrix);
             mesh.quaternion.setFromRotationMatrix(reticle.matrix);
             scene.add(mesh);
-            console.log('Picture placed in scene');
+            console.log('Picture placed in scene.');
         }, undefined, (error) => {
             console.error(`Texture load error: ${error.message}`);
         });
     } else {
-        console.warn('Reticle not visible; picture not placed');
+        console.warn('Reticle not visible; picture not placed.');
     }
 }
 
@@ -180,8 +136,10 @@ function render(timestamp, frame) {
                 const pose = hit.getPose(localSpace);
                 reticle.visible = true;
                 reticle.matrix.fromArray(pose.transform.matrix);
+                console.log('Hit test successful. Reticle updated.');
             } else {
                 reticle.visible = false;
+                console.warn('No hit test results.');
             }
         }
     }
